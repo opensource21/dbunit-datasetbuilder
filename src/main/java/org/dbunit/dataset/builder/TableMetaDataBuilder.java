@@ -20,22 +20,25 @@
  */
 package org.dbunit.dataset.builder;
 
-import java.util.LinkedHashMap;
-
 import org.dbunit.dataset.Column;
+import org.dbunit.dataset.ColumnKeyMap;
+import org.dbunit.dataset.CustomTableMetaData;
 import org.dbunit.dataset.DataSetException;
-import org.dbunit.dataset.DefaultTableMetaData;
 import org.dbunit.dataset.ITableMetaData;
+import org.dbunit.dataset.builder.valuegenerator.ValueGenerator;
+import org.dbunit.dataset.datatype.DataType;
 
 public class TableMetaDataBuilder {
 
     private final String tableName;
-    private final IStringPolicy policy;
-    private final LinkedHashMap<String, Column> keysToColumns = new LinkedHashMap<String, Column>();
+    private final ColumnKeyMap<Column> keysToColumns = new ColumnKeyMap<Column>();
+    private final ColumnKeyMap<ValueGenerator<? extends Object>> valueGenerators = new ColumnKeyMap<ValueGenerator<? extends Object>>();
 
-    public TableMetaDataBuilder(String tableName, IStringPolicy policy) {
+    public TableMetaDataBuilder( String tableName ) {
+    	if( tableName == null || tableName.trim().toString().isEmpty() ) {
+    		throw new IllegalArgumentException("Table name must not be null.");
+    	}
         this.tableName = tableName;
-        this.policy = policy;
     }
 
     public TableMetaDataBuilder with(ITableMetaData metaData) throws DataSetException {
@@ -51,37 +54,35 @@ public class TableMetaDataBuilder {
 
     public TableMetaDataBuilder with(Column column) {
         if (isUnknown(column)) {
-            add(column);
+        	this.keysToColumns.put( column.getColumnName(), column );
         }
         return this;
     }
-
-    public int numberOfColumns() {
-        return keysToColumns.size();
+    
+    public TableMetaDataBuilder with(String column) {
+    	with( new Column( column, DataType.UNKNOWN ) );
+    	return this;
+    }
+	
+	public TableMetaDataBuilder addValueGenerator( String columnName, ValueGenerator<? extends Object> valueGenerator ) {
+		this.with( columnName );
+		this.valueGenerators.put( columnName, valueGenerator );
+        return this;
     }
 
-    public ITableMetaData build() {
-        return new DefaultTableMetaData(tableName, columns());
+    public CustomTableMetaData build() {
+        return new CustomTableMetaData( tableName, columns(), new String[0], this.valueGenerators );
     }
-
-    private void add(Column column) {
-        keysToColumns.put(toKey(column), column);
-    }
-
-    private String toKey(Column column) {
-        return policy.toKey(column.getColumnName());
-    }
+    
+    public String getTableName() {
+		return this.tableName;
+	}
 
     private boolean isUnknown(Column column) {
-        return !isKnown(column);
-    }
-
-    private boolean isKnown(Column column) {
-        return keysToColumns.containsKey(toKey(column));
+        return !( this.keysToColumns.containsKey( column.getColumnName() ) );
     }
 
     private Column[] columns() {
-        return keysToColumns.values().toArray(new Column[keysToColumns.size()]);
+        return this.keysToColumns.values().toArray(new Column[this.keysToColumns.size()]);
     }
-
 }

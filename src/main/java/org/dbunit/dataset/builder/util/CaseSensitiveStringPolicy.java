@@ -18,12 +18,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-package org.dbunit.dataset.builder;
+package org.dbunit.dataset.builder.util;
 
-public interface IStringPolicy {
+public class CaseSensitiveStringPolicy implements IStringPolicy {
 
-    boolean areEqual(String first, String second);
+    @Override
+    public boolean areEqual(String first, String second) {
+        return first.equals(second);
+    }
 
-    String toKey(String value);
+    @Override
+    public String toKey(String value) {
+        return value;
+    }
 
 }

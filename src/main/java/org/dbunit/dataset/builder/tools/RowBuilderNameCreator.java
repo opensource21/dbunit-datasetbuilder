@@ -1,4 +1,4 @@
-package org.dbunit.dataset.builder;
+package org.dbunit.dataset.builder.tools;
 
 public interface RowBuilderNameCreator {
 

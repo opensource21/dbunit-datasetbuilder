@@ -19,7 +19,7 @@
  *
  */
 
-package org.dbunit.dataset.builder;
+package org.dbunit.dataset.builder.tools;
 
 /**
  * Creates names for the rowbuilder with no conversions.

@@ -2,6 +2,7 @@ package org.dbunit.dataset.builder;
 
 import static org.junit.Assert.*;
 
+import org.dbunit.dataset.builder.util.CaseInsensitiveStringPolicy;
 import org.junit.Test;
 
 public class CaseInsensitiveStringPolicyTest {

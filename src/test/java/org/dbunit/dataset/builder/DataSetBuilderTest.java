@@ -1,138 +1,155 @@
 package org.dbunit.dataset.builder;
 
+import static org.dbunit.dataset.builder.RawDataSetRowBuilder.newRawRow;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
+import org.dbunit.dataset.DataSetException;
 import org.dbunit.dataset.IDataSet;
 import org.dbunit.dataset.ITable;
+import org.dbunit.dataset.ITableMetaData;
+import org.dbunit.dataset.NoSuchTableException;
+import org.dbunit.dataset.Table;
+import org.junit.Assert;
 import org.junit.Test;
 
 public class DataSetBuilderTest {
 
-    @Test
-    public void ignoringCaseByDefault() throws Exception {
-        DataSetBuilder builder = new DataSetBuilder();
-        builder.ensureTableIsPresent("PeRsoN");
+	@Test
+	public void addsEmptyTables() throws Exception {
+		IDataSet dataSet = new DataSetBuilder()
+				.add(new Table("PERSON"))
+				.add(new Table("ADDRESS"))
+				.build();
 
-        assertTrue(builder.containsTable("Person"));
-    }
+		assertEquals(0, dataSet.getTable("PERSON").getRowCount());
+		assertEquals(0, dataSet.getTable("ADDRESS").getRowCount());
+	}
+	
+	@Test
+	public void caseInsensitiveTableNamesByDefault() throws Exception {
+		IDataSet dataSet = new DataSetBuilder()
+				.add( new Table("PeRsoN"))
+				.build();
 
-    @Test
-    public void notIgnoringCaseWhenSpecified() throws Exception {
-        DataSetBuilder builder = new DataSetBuilder(false);
-        builder.ensureTableIsPresent("PeRsoN");
+		assertNotNull( dataSet.getTable("Person") );
+	}
 
-        assertFalse(builder.containsTable("Person"));
-        assertTrue(builder.containsTable("PeRsoN"));
-    }
+	@Test
+	public void caseSensitiveTableNamesWhenSpecified() throws Exception {
+		IDataSet dataSet = new DataSetBuilder( true )
+				.add( new Table("PeRsoN"))
+				.build();
 
-    @Test
-    public void ensuringPresenceOfExistingTableMakesNoHarm() throws Exception {
-        DataSetBuilder builder = new DataSetBuilder();
-        builder.newRow("person").add();
-        builder.ensureTableIsPresent("PeRsoN");
+		assertNotNull( dataSet.getTable("PeRsoN") );
+		
+		try {
+			dataSet.getTable("Person");
+			Assert.fail("Should had thrown exception.");
+		} catch( NoSuchTableException e ) {
+			//success.
+		}
+	}
 
-        assertTrue(builder.containsTable("Person"));
-    }
+	@Test
+	public void tablesAreKeptInOrder() throws Exception {
+		IDataSet dataSet = new DataSetBuilder()
+				.add( new Table("PERSON"))
+				.add( new Table("ADDRESS"))
+				.add( new Table("_TABLE_"))
+				.build();
 
-    @Test
-    public void tablesAreKeptInOrder() throws Exception {
-        DataSetBuilder builder = new DataSetBuilder();
-        builder.newRow("PERSON").add();
-        builder.newRow("ADDRESS").add();
-        builder.newRow("_TABLE_").add();
-        IDataSet dataSet = builder.build();
+		assertArrayEquals(new String[]{"PERSON", "ADDRESS", "_TABLE_"}, dataSet.getTableNames());
+	}
+	
+	@Test
+	public void addsDataForSingleRow() throws Exception {
+		IDataSet dataSet = new DataSetBuilder()
+				.add( newRawRow("PERSON").with("NAME", "Bob").with("AGE", 18) )
+				.build();
 
-        assertArrayEquals(new String[]{"PERSON", "ADDRESS", "_TABLE_"}, dataSet.getTableNames());
-    }
+		ITable table = dataSet.getTable("PERSON");
+		assertEquals(1, table.getRowCount());
+		assertEquals("Bob", table.getValue(0, "NAME"));
+		assertEquals(18, table.getValue(0, "AGE"));
+	}
 
-    @Test
-    public void addsDataForSingleRow() throws Exception {
-        DataSetBuilder builder = new DataSetBuilder();
-        builder.newRow("PERSON").with("NAME", "Bob").with("AGE", 18).add();
+	@Test
+	public void addsDataForMultipleRowsOfDifferentTables() throws Exception {
+		IDataSet dataSet = new DataSetBuilder()
+				.add( newRawRow("PERSON").with("NAME", "Bob").with("AGE", 18) )
+				.add( newRawRow("ADDRESS").with("STREET", "Main Street").with("NUMBER", 42) )
+				.add( newRawRow("PERSON").with("NAME", "Alice").with("AGE", 23) )
+				.build();
 
-        IDataSet dataSet = builder.build();
-        ITable table = dataSet.getTable("PERSON");
-        assertEquals(1, table.getRowCount());
-        assertEquals("Bob", table.getValue(0, "NAME"));
-        assertEquals(18, table.getValue(0, "AGE"));
-    }
+		ITable table = dataSet.getTable("PERSON");
+		assertEquals(2, table.getRowCount());
+		assertEquals("Bob", table.getValue(0, "NAME"));
+		assertEquals(18, table.getValue(0, "AGE"));
+		assertEquals("Alice", table.getValue(1, "NAME"));
+		assertEquals(23, table.getValue(1, "AGE"));
 
-    @Test
-    public void addsDataWithColumnSpec() throws Exception {
-        DataSetBuilder builder = new DataSetBuilder();
-        ColumnSpec<String> name = ColumnSpec.newColumn("NAME");
-        ColumnSpec<Integer> age = ColumnSpec.newColumn("AGE");
-        builder.newRow("PERSON").with(name, "Bob").with(age, 18).add();
-        
-        IDataSet dataSet = builder.build();
-        ITable table = dataSet.getTable("PERSON");
-        assertEquals(1, table.getRowCount());
-        assertEquals("Bob", table.getValue(0, "NAME"));
-        assertEquals(18, table.getValue(0, "AGE"));
-    }
+		table = dataSet.getTable("ADDRESS");
+		assertEquals(1, table.getRowCount());
+		assertEquals("Main Street", table.getValue(0, "STREET"));
+		assertEquals(42, table.getValue(0, "NUMBER"));
+	}
 
-    @Test
-    public void addsDataForMultipleRowsOfDifferentTables() throws Exception {
-        DataSetBuilder builder = new DataSetBuilder();
-        builder.newRow("PERSON").with("NAME", "Bob").with("AGE", 18).add();
-        builder.newRow("ADDRESS").with("STREET", "Main Street").with("NUMBER", 42).add();
-        builder.newRow("PERSON").with("NAME", "Alice").with("AGE", 23).add();
+	@Test
+	public void addsNewColumnsOnTheFly() throws Exception {
+		IDataSet dataSet = new DataSetBuilder()
+				.add( newRawRow("PERSON").with("NAME", "Bob") )
+				.add( newRawRow("PERSON").with("AGE", 18) )
+				.build();
 
-        IDataSet dataSet = builder.build();
-        ITable table = dataSet.getTable("PERSON");
-        assertEquals(2, table.getRowCount());
-        assertEquals("Bob", table.getValue(0, "NAME"));
-        assertEquals(18, table.getValue(0, "AGE"));
-        assertEquals("Alice", table.getValue(1, "NAME"));
-        assertEquals(23, table.getValue(1, "AGE"));
+		ITable table = dataSet.getTable("PERSON");
+		assertEquals(2, table.getRowCount());
+		assertEquals("Bob", table.getValue(0, "NAME"));
+		assertNull(table.getValue(0, "AGE"));
+		assertNull(table.getValue(1, "NAME"));
+		assertEquals(18, table.getValue(1, "AGE"));
+	}
 
-        table = dataSet.getTable("ADDRESS");
-        assertEquals(1, table.getRowCount());
-        assertEquals("Main Street", table.getValue(0, "STREET"));
-        assertEquals(42, table.getValue(0, "NUMBER"));
-    }
+	@Test
+	public void addDataSet() throws Exception {
+		IDataSet dataSet = new DataSetBuilder()
+				.add( newRawRow("PERSON").with("NAME", "Bob").with("AGE", 18) )
+				.build();
 
-    @Test
-    public void addsNewColumnsOnTheFly() throws Exception {
-        DataSetBuilder builder = new DataSetBuilder();
-        builder.newRow("PERSON").with("NAME", "Bob").add();
-        builder.newRow("PERSON").with("AGE", 18).add();
+		ITable table = dataSet.getTable("PERSON");
 
-        IDataSet dataSet = builder.build();
-        ITable table = dataSet.getTable("PERSON");
-        assertEquals(2, table.getRowCount());
-        assertEquals("Bob", table.getValue(0, "NAME"));
-        assertNull(table.getValue(0, "AGE"));
-        assertNull(table.getValue(1, "NAME"));
-        assertEquals(18, table.getValue(1, "AGE"));
-    }
+		assertEquals(1, table.getRowCount());
 
-    @Test
-    public void addDataSet() throws Exception {
-        DataSetBuilder builder = new DataSetBuilder();
-        builder.newRow("PERSON").with("NAME", "Bob").with("AGE", 18).add();
+		IDataSet dataSet2 = new DataSetBuilder()
+				.add( newRawRow("PERSON").with("NAME", "John").with("AGE", 19) )
+				.add( dataSet )
+				.build();
 
-        IDataSet dataSet = builder.build();
-        ITable table = dataSet.getTable("PERSON");
+		ITable table2 = dataSet2.getTable("PERSON");
 
-        assertEquals(1, table.getRowCount());
+		assertEquals(2, table2.getRowCount());
+		assertEquals("John", table2.getValue(0, "NAME"));
+		assertEquals(19, table2.getValue(0, "AGE"));
 
-        builder = new DataSetBuilder();
-        builder.newRow("PERSON").with("NAME", "John").with("AGE", 19).add();
-        builder.addDataSet(dataSet);
+		assertEquals("Bob", table2.getValue(1, "NAME"));
+		assertEquals(18, table2.getValue(1, "AGE"));
+	}
+	
+	@Test
+	public void columnIndexesAreKeptInOrder() throws DataSetException {
+		IDataSet dataSet = new DataSetBuilder()
+				.add( newRawRow("PERSON").with("NAME", "Bob") )
+				.add( newRawRow("PERSON").with("AGE", 18).with("NAME", "Alice") )
+				.add( newRawRow("PERSON").with("SEX", "MALE").with("NAME", "Richard") )
+				.build();
 
-        IDataSet dataSet2 = builder.build();
-           ITable table2 = dataSet2.getTable("PERSON");
-
-           assertEquals(2, table2.getRowCount());
-           assertEquals("John", table2.getValue(0, "NAME"));
-           assertEquals(19, table2.getValue(0, "AGE"));
-
-           assertEquals("Bob", table2.getValue(1, "NAME"));
-           assertEquals(18, table2.getValue(1, "AGE"));
-    }
+		ITable table = dataSet.getTable("PERSON");
+		ITableMetaData tableMetaData = table.getTableMetaData();
+		
+		assertEquals(0, tableMetaData.getColumnIndex("NAME"));
+		assertEquals(1, tableMetaData.getColumnIndex("AGE"));
+		assertEquals(2, tableMetaData.getColumnIndex("SEX"));
+	}
 }

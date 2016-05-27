@@ -1,0 +1,5 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<dataset>
+  <ADDRESS STREET="Main Street" NUMBER="42"/>
+  <ADDREss STREET="Main Street 2" NUMBER="43"/>
+</dataset>

@@ -21,14 +21,19 @@
 
 package org.dbunit.dataset.builder;
 
-import static org.dbunit.dataset.builder.DataSetBuilder.newBasicRow;
 import static org.dbunit.dataset.builder.DataSetBuilderIntegrationTest.PERSONRowBuilder.newPERSON;
+import static org.dbunit.dataset.builder.RawDataSetRowBuilder.newRawRow;
+import static org.dbunit.dataset.builder.valuegenerator.ValueGeneratorMaker.newFixedValueGenerator;
 
 import java.sql.Date;
 
 import org.dbunit.Assertion;
+import org.dbunit.dataset.CustomTableMetaData;
 import org.dbunit.dataset.IDataSet;
 import org.dbunit.dataset.ReplacementDataSet;
+import org.dbunit.dataset.Row;
+import org.dbunit.dataset.Table;
+import org.dbunit.dataset.xml.FlatXmlDataSet;
 import org.dbunit.dataset.xml.FlatXmlDataSetBuilder;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,7 +48,6 @@ import org.junit.Test;
  */
 public class DataSetBuilderIntegrationTest {
 
-
     @Before
     public void setUp() throws Exception {
     }
@@ -53,100 +57,114 @@ public class DataSetBuilderIntegrationTest {
      */
     @Test
     public void testBuild() throws Exception {
-        DataSetBuilder builder = new DataSetBuilder();
-        newPERSON().NAME("Bob").BIRTHPLACE("NEW YORK").addTo(builder);
-        newPERSON().NAME("Alice").BIRTHPLACE("London").addTo(builder);
-        newBasicRow("ADDRESS").with("STREET", "Main Street").with("NUMBER", 42).addTo(builder);
-
-        final IDataSet actual = builder.build();
+    	//raw builder with default values.
+		IDataSet actual = new DataSetBuilder()
+			.add(new Table("PERSON")
+					.addValueGenerator("DATE_OF_BIRTH", newFixedValueGenerator(new Date(0)))
+			        .addValueGenerator("NAME", newFixedValueGenerator(""))
+			        .addValueGenerator("VERSION", newFixedValueGenerator(0L))
+			        .addValueGenerator("FIRSTNAME", newFixedValueGenerator(""))
+			        .addValueGenerator("ID", newFixedValueGenerator(0L))
+			        .addValueGenerator("SEX", newFixedValueGenerator(null))
+			        .addValueGenerator("BIRTHPLACE", newFixedValueGenerator(""))
+        			.add(new Row().add("NAME", "Bob").add("BIRTHPLACE", "NEW YORK"))
+					.add(new Row().add("NAME", "Alice").add("BIRTHPLACE", "London")))
+			.add(new Table("ADDRESS")
+	    			.add(new Row().add("STREET", "Main Street").add("NUMBER", 42)))
+			.build();
+		
+		//table-specific builder approach.
+		IDataSet actual2 = new DataSetBuilder()
+			.add( newPERSON().NAME("Bob").BIRTHPLACE("NEW YORK") )
+			.add( newPERSON().NAME("Alice").BIRTHPLACE("London") )
+			.add( newRawRow("ADDRESS").with("STREET", "Main Street").with("NUMBER", 42) )
+			.build();
 
         ReplacementDataSet expected = new ReplacementDataSet(new FlatXmlDataSetBuilder().build(
                 this.getClass().getResourceAsStream("/reference.xml")));
+        expected.addReplacementObject("[EPOCH_TIME]", new Date(0));
         expected.addReplacementObject("[NULL]", null);
+
+        Assertion.assertEquals(expected, actual);
+        
+        Assertion.assertEquals(expected, actual2);
+    }
+    
+    @Test
+    public void testBuildCaseSensitive() throws Exception {
+    	final IDataSet actual = new DataSetBuilder( true )
+        		.add( newRawRow("ADDRESS").with("STREET", "Main Street").with("NUMBER", 42) )
+        		.add( newRawRow("ADDREss").with("STREET", "Main Street 2").with("NUMBER", 43) )
+        		.build();
+
+        FlatXmlDataSet expected = new FlatXmlDataSetBuilder()
+        		.setCaseSensitiveTableNames(true)
+        		.build(this.getClass().getResourceAsStream("/reference_case_sensitive.xml"));
 
         Assertion.assertEquals(expected, actual);
     }
 
-    static class PERSONRowBuilder extends BasicDataRowBuilder {
+    static class PERSONRowBuilder extends AbstractDataSetRowBuilder {
 
         public static final String TABLE_NAME = "PERSON";
 
-        public static final String C_DATE_OF_BIRTH = "DATE_OF_BIRTH";
-        public static final String C_BIRTHPLACE = "BIRTPLACE";
-        public static final String C_SEX = "SEX";
-        public static final String C_ID = "ID";
-        public static final String C_NAME = "NAME";
-        public static final String C_VERSION = "VERSION";
-        public static final String C_FIRSTNAME = "FIRSTNAME";
-
-        public static final String[] PRIMARY_KEY = {C_ID};
-
-        public static final String[] ALL_COLUMNS = {C_DATE_OF_BIRTH, C_BIRTHPLACE,
-            C_SEX, C_ID, C_VERSION, C_NAME, C_FIRSTNAME};
-
-        public PERSONRowBuilder(String... identifierColumns) {
-            super(TABLE_NAME, identifierColumns);
-            setAllColumnNames(ALL_COLUMNS);
-            addDefaultValue(C_DATE_OF_BIRTH, new Date(0));
-            addDefaultValue(C_NAME, "");
-            addDefaultValue(C_VERSION, new Long("0"));
-            addDefaultValue(C_FIRSTNAME, "");
-            addDefaultValue(C_ID, new Long("0"));
-            addDefaultValue(C_BIRTHPLACE, "");
+        private static final String C_ID = "ID";
+        private static final String C_NAME = "NAME";
+        private static final String C_FIRSTNAME = "FIRSTNAME";
+        private static final String C_SEX = "SEX";
+        private static final String C_DATE_OF_BIRTH = "DATE_OF_BIRTH";
+        private static final String C_BIRTHPLACE = "BIRTHPLACE";
+        private static final String C_VERSION = "VERSION";
+        
+        public static final CustomTableMetaData PERSON_TABLE_META_DATA;
+        
+        static {
+        	PERSON_TABLE_META_DATA = new TableMetaDataBuilder( TABLE_NAME )
+        			.addValueGenerator( C_ID, newFixedValueGenerator( 0L ) )
+        			.addValueGenerator( C_NAME, newFixedValueGenerator("") )
+        			.addValueGenerator( C_FIRSTNAME, newFixedValueGenerator("") )
+		        	.addValueGenerator( C_SEX, newFixedValueGenerator( null ) )
+		        	.addValueGenerator( C_DATE_OF_BIRTH, newFixedValueGenerator( new Date(0) ) )
+		        	.addValueGenerator( C_BIRTHPLACE, newFixedValueGenerator("") )
+		        	.addValueGenerator( C_VERSION, newFixedValueGenerator( 0L ) )
+        			.build();
+        }
+        
+        public static PERSONRowBuilder newPERSON() {
+            return new PERSONRowBuilder();
+        }
+        
+        public final PERSONRowBuilder ID (Long value) {
+            return super._with(C_ID, value);
         }
 
+        public final PERSONRowBuilder NAME (String value) {
+            return super._with(C_NAME, value);
+        }
+        
+        public final PERSONRowBuilder FIRSTNAME (String value) {
+            return super._with(C_FIRSTNAME, value);
+        }
+        
+        public final PERSONRowBuilder SEX (Integer value) {
+            return super._with(C_SEX, value);
+        }
+        
         public final PERSONRowBuilder DATE_OF_BIRTH (Date value) {
-            with(C_DATE_OF_BIRTH, value);
-            return this;
+            return super._with(C_DATE_OF_BIRTH, value);
         }
 
         public final PERSONRowBuilder BIRTHPLACE (String value) {
-            with(C_BIRTHPLACE, value);
-            return this;
+            return super._with(C_BIRTHPLACE, value);
         }
-
-
-
-        public final PERSONRowBuilder SEX (Integer value) {
-            with(C_SEX, value);
-            return this;
-        }
-
-
-        public final PERSONRowBuilder ID (Long value) {
-            with(C_ID, value);
-            return this;
-        }
-
-
-
-        public final PERSONRowBuilder NAME (String value) {
-            with(C_NAME, value);
-            return this;
-        }
-
 
         public final PERSONRowBuilder VERSION (Long value) {
-            with(C_VERSION, value);
-            return this;
+            return super._with(C_VERSION, value);
         }
-
-
-        public final PERSONRowBuilder FIRSTNAME (String value) {
-            with(C_FIRSTNAME, value);
-            return this;
+        
+        @Override
+        protected CustomTableMetaData getTableMetaData() {
+        	return PERSON_TABLE_META_DATA;
         }
-
-
-        public static PERSONRowBuilder newPERSON() {
-            return new PERSONRowBuilder(PRIMARY_KEY);
-        }
-
-        public static PERSONRowBuilder newPERSON(String... identifierColumns) {
-            return new PERSONRowBuilder(identifierColumns);
-        }
-
     }
-
-
 }

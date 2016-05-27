@@ -1,6 +1,6 @@
 package org.dbunit.dataset.builder;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import org.dbunit.dataset.Column;
 import org.dbunit.dataset.DefaultTableMetaData;
@@ -10,11 +10,25 @@ import org.junit.Test;
 
 public class TableMetaDataBuilderTest {
 
-	private TableMetaDataBuilder builder = new TableMetaDataBuilder("MY_TABLE_NAME", new CaseInsensitiveStringPolicy());
+	private TableMetaDataBuilder builder = new TableMetaDataBuilder("MY_TABLE_NAME");
+	
+	@Test(expected=IllegalArgumentException.class)
+	public void createWithNullTableName() {
+		new TableMetaDataBuilder(null);
+	}
+	
+	@Test(expected=IllegalArgumentException.class)
+	public void createWithEmptyTableName() {
+		new TableMetaDataBuilder("");
+	}
+	
+	@Test(expected=IllegalArgumentException.class)
+	public void createWithEmptyTrimTableName() {
+		new TableMetaDataBuilder(" ");
+	}
 	
 	@Test
 	public void isEmptyInTheBeginning() throws Exception {
-		assertEquals(0, builder.numberOfColumns());
 		Column[] columns = builder.build().getColumns();
 		assertEquals(0, columns.length);
 	}
@@ -25,7 +39,6 @@ public class TableMetaDataBuilderTest {
 		
 		builder.with(column);
 		
-		assertEquals(1, builder.numberOfColumns());
 		Column[] columns = builder.build().getColumns();
  		assertEquals(1, columns.length);
 		assertEquals(column, columns[0]);
@@ -38,7 +51,6 @@ public class TableMetaDataBuilderTest {
 
 		builder.with(originalColumn).with(sameColumnDifferentType);
 		
-		assertEquals(1, builder.numberOfColumns());
 		Column[] columns = builder.build().getColumns();
 		assertEquals(1, columns.length);
 		assertEquals(originalColumn, columns[0]);
@@ -53,7 +65,6 @@ public class TableMetaDataBuilderTest {
 		
 		builder.with(existingColumn).with(metaData);
 		
-		assertEquals(3, builder.numberOfColumns());
 		Column[] columns = builder.build().getColumns();
 		assertEquals(3, columns.length);
 		assertEquals(existingColumn, columns[0]);

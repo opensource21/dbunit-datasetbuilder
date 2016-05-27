@@ -30,6 +30,9 @@ import org.dbunit.dataset.Column;
 import org.dbunit.dataset.DataSetException;
 import org.dbunit.dataset.IDataSet;
 import org.dbunit.dataset.ITableMetaData;
+import org.dbunit.dataset.builder.util.CaseInsensitiveStringPolicy;
+import org.dbunit.dataset.builder.util.CaseSensitiveStringPolicy;
+import org.dbunit.dataset.builder.util.IStringPolicy;
 import org.dbunit.dataset.stream.BufferedConsumer;
 import org.dbunit.dataset.stream.DataSetProducerAdapter;
 
@@ -46,6 +49,7 @@ public class DataSetRowChanger extends BufferedConsumer implements IDataSetManip
     private final Map<String, List<BasicDataRowBuilder>> tableNameToRow = new HashMap<String, List<BasicDataRowBuilder>>();
 
     private final IStringPolicy stringPolicy;
+    private final IStringPolicy stringPolicyForColumnNames = new CaseInsensitiveStringPolicy();
 
     private String currentTableName;
     private Column[] currentTableColumns;
@@ -105,7 +109,7 @@ public class DataSetRowChanger extends BufferedConsumer implements IDataSetManip
                 boolean match = true;
                 final String[] identifierCols = dataRowBuilder.getIdentifierColumns();
                 for (int i = 0; i < identifierCols.length; i++) {
-                    final Integer idColNr = columnameToColNr.get(stringPolicy.toKey(
+                    final Integer idColNr = columnameToColNr.get(stringPolicyForColumnNames.toKey(
                             identifierCols[i]));
                     if (idColNr == null) {
                         throw new IllegalStateException(identifierCols[i] + " is unknown.");
@@ -136,7 +140,7 @@ public class DataSetRowChanger extends BufferedConsumer implements IDataSetManip
         currentTableName = metaData.getTableName();
         currentTableColumns = metaData.getColumns();
         for (int i = 0; i < currentTableColumns.length; i++) {
-            columnameToColNr.put(stringPolicy.toKey(currentTableColumns[i].getColumnName()),
+            columnameToColNr.put(stringPolicyForColumnNames.toKey(currentTableColumns[i].getColumnName()),
                     Integer.valueOf(i));
         }
         super.startTable(metaData);
